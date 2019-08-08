@@ -133,6 +133,14 @@ struct mara::iso2d
         double sound_speed_squared_r,
         const unit_vector_t& nhat);
 
+    static inline flux_t riemann_hlle_moving_face(
+        const primitive_t& Pl,
+        const primitive_t& Pr,
+        double sound_speed_squared_l,
+        double sound_speed_squared_r,
+        const unit_vector_t& nhat,
+        mara::unit_velocity<double> face_speed);
+
     static inline flux_t riemann_hllc(
         const primitive_t& Pl,
         const primitive_t& Pr,
@@ -529,7 +537,7 @@ mara::iso2d::flux_t mara::iso2d::riemann_hlle_moving_face(
         else if (am    <= face_speed && face_speed <= ap) return (Fl * ap - Fr * am - (Ul - Ur) * ap * am) / (ap - am);
         else if (ap    <= face_speed                )     return  Fr;
         throw std::invalid_argument("riemann_hlle_moving_face::interface_flux");
-    }
+    };
 
     auto interface_conserved_state = [=] ()
     {
@@ -537,7 +545,7 @@ mara::iso2d::flux_t mara::iso2d::riemann_hlle_moving_face(
         else if (am    <= face_speed && face_speed <= ap) return (Ur * ap - Ul * am + (Fl - Fr)) / (ap - am);
         else if (ap    <= face_speed                )     return  Ur;
         throw std::invalid_argument("riemann_hlle_moving_face::interface_flux");
-    }
+    };
 
     return interface_flux() - interface_conserved_state() * face_speed;
 }
