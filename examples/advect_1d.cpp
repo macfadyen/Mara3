@@ -61,6 +61,13 @@ struct solver_data_t
     int    rk_order;
 };
 
+struct aperture_data_t
+{
+	double aperture_radius;
+	double aperture_speed;
+	double aperture_mass;
+};
+
 double gaussian (double x)
 {
 	return std::exp(-0.5 * x * x);
@@ -68,10 +75,10 @@ double gaussian (double x)
 
 state_t initialize_state(const mara::config_t cfg)
 {
-	auto nx = cfg.get_int("resolution");
-	auto x_vertices = linspace(cfg.get_double("xmin"),cfg.get_double("xmax"), nx + 1);
+	auto nx = cfg.get_int( "resolution" );
+	auto x_vertices = linspace(cfg.get_double("xmin"), cfg.get_double("xmax"), nx + 1);
 	auto x_centers = x_vertices | midpoint_on_axis(0);
-	auto u = x_centers | map([] (auto xi) { return gaussian(xi); });
+	auto u = x_centers | map( [] (auto xi) { return gaussian(xi); } );
 	return{0, 0.0, x_vertices.shared(), u.shared()};
 }
 
@@ -107,10 +114,21 @@ auto update_u (const state_t& state, double advection_speed, double dt)
 	auto Fl = F | select_axis(0).from(0).to(1).from_the_end();
 	auto Fr = F | select_axis(0).from(1).to(0).from_the_end();	
 	auto Fhat = advection_speed > 0.0 ? Fl : Fr;
-	auto delta_Fhat =     Fhat | difference_on_axis(0);
+	auto delta_Fhat =     Fhat | difference_on_axis(0); // defined on faces
 	auto dx = state.x_vertices | difference_on_axis(0);
 
-	return state.u - delta_Fhat * dt / dx | to_shared();
+/*	double xa = 0.0;
+	double ra = 0.5;
+	double aperture_speed = 0.25;
+	auto x_centers = state.x_vertices | midpoint_on_axis(0);
+	auto aperture_mask = x_centers | map( [] (auto xi) { return (std::abs(xi - 0.0) < 0.5 ? 0.0: 1.0); } );
+	auto aperture_normal = aperture_mask | difference_on_axis(0);
+	auto u_at_vertex = Fhat / advection_speed;
+	auto aperture_mass = aperture_mass - (Fhat - u_at_vertex * aperture_speed) * aperture_normal * dt / dx;
+*/
+	return state.u - ( delta_Fhat * dt / dx ) | to_shared();
+
+//	auto du_aperture = Fl * dt / dx | to_shared();
 }
 /*
 auto next_state(const state_t& state, const solver_data_t& solver_data)
@@ -169,22 +187,20 @@ int main(int argc, const char* argv[])
     mara::pretty_print(std::cout, "config", run_config);
     auto solver_data = create_solver_data(run_config);
     auto state = initialize_state(run_config);
-//    write_diagnostics(state, "diagnostics_0000.h5");
 
     while( state.time < run_config.get_double("tfinal") )
     {
     	state = new_state(state, solver_data);
 		
-	//	printf( " %d : t = %0.2f \n", state.iteration, state.time );
-    	std::printf("[%04d] time=%3.7lf\n",state.iteration,state.time);	    	
+    	std::printf("[%06d] time=%3.6lf\n", state.iteration, state.time);	    	
 
-    	if (state.iteration%10 == 0)
+    	if ( state.iteration % 10 == 0 )
     	{
     		auto outdir = run_config.get_string("outdir");
     		auto ichkpt = run_config.get_int   ("ichkpt");    		
     		auto fname  = mara::filesystem::join(outdir, mara::create_numbered_filename("chkpt", ichkpt, "h5"));
     	    write_checkpoint(state, fname);
-    	    run_config = run_config.set("ichkpt", ++ichkpt );
+    	    run_config = run_config.set( "ichkpt", ++ichkpt );
     	}
     }
 
